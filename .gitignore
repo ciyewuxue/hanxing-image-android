@@ -1,0 +1,23 @@
+# Android / Gradle
+.gradle/
+build/
+app/build/
+.kotlin/
+local.properties
+*.iml
+.idea/
+
+# 打包产物（源码仓库不放二进制）
+dist/
+*.apk
+*.aab
+
+# 签名材料绝不入库
+keystore/
+keystore.properties
+*.jks
+*.keystore
+
+# 本地测试产物与备份
+test-output/
+backup-*/
