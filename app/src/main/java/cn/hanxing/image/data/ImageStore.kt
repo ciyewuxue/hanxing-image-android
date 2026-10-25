@@ -148,15 +148,8 @@ class ImageStore(context: Context) {
         if (source.exists()) {
             runCatching { source.renameTo(File(trashDir, record.fileName)) }
         }
-        // 对话被删空后标题回到默认，下一次生图会按新的第一张重新起名
-        if (_records.none { it.conversationId == record.conversationId }) {
-            val conversationIndex = _conversations.indexOfFirst { it.id == record.conversationId }
-            if (conversationIndex >= 0 && _conversations[conversationIndex].title != Conversation.DEFAULT_TITLE) {
-                _conversations[conversationIndex] =
-                    _conversations[conversationIndex].copy(title = Conversation.DEFAULT_TITLE)
-                persistConversations()
-            }
-        }
+        // 标题始终跟着当前最早一张图走：删掉第一张就换成下一张，删空就回到默认
+        syncTitle(record.conversationId)
         persist()
         return record
     }
@@ -170,22 +163,25 @@ class ImageStore(context: Context) {
         if (!trashed.renameTo(target)) return false
         if (_records.none { it.id == record.id }) {
             _records.add(0, record)
-            // 撤销的是最后一张时，标题已在删除时重置，这里按该对话最早的一张补回来
-            val conversationIndex = _conversations.indexOfFirst { it.id == record.conversationId }
-            if (conversationIndex >= 0 && _conversations[conversationIndex].title == Conversation.DEFAULT_TITLE) {
-                val earliest = _records
-                    .filter { it.conversationId == record.conversationId }
-                    .minByOrNull { it.createdAt }
-                if (earliest != null) {
-                    _conversations[conversationIndex] = _conversations[conversationIndex].copy(
-                        title = Conversation.titleFromPrompt(earliest.prompt),
-                    )
-                    persistConversations()
-                }
-            }
+            // 恢复的如果是最早一张，标题跟着回到它的提示词
+            syncTitle(record.conversationId)
             persist()
         }
         return true
+    }
+
+    /** 用当前最早的一张图重算标题；没有图就回到「新对话」。 */
+    private fun syncTitle(conversationId: String) {
+        val index = _conversations.indexOfFirst { it.id == conversationId }
+        if (index < 0) return
+        val earliest = _records
+            .filter { it.conversationId == conversationId }
+            .minByOrNull { it.createdAt }
+        val title = earliest?.let { Conversation.titleFromPrompt(it.prompt) } ?: Conversation.DEFAULT_TITLE
+        if (_conversations[index].title != title) {
+            _conversations[index] = _conversations[index].copy(title = title)
+            persistConversations()
+        }
     }
 
     @Synchronized

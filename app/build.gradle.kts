@@ -19,8 +19,8 @@ android {
         applicationId = "cn.hanxing.image"
         minSdk = 29
         targetSdk = 36
-        versionCode = 20
-        versionName = "1.2.8"
+        versionCode = 21
+        versionName = "1.2.9"
     }
 
     signingConfigs {
