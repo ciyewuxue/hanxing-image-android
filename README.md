@@ -1,6 +1,6 @@
 # 寒星生图 · Hanxing Image
 
-一个 Android 原生的 AI 生图客户端，Kotlin + Jetpack Compose 编写，不走 WebView。接任何兼容 OpenAI Images API 的服务，Key 由使用者自己填。
+一个 Android 原生的 AI 生图客户端，Kotlin + Jetpack Compose 编写，不走 WebView。它不内置模型，也不带任何服务商或 Key——你需要自备一个兼容 OpenAI Images API 的 Key，首次打开填一次才能用。
 
 <p align="center">
   <img src="docs/home.png" width="320" alt="新对话首页" />
@@ -9,6 +9,25 @@
 ## 下载
 
 不想自己编译的话，直接下 APK：[最新版本 Releases](../../releases/latest)（Android 10 及以上）。
+
+## 首次使用：先准备一个 Key
+
+**这个应用不是打开即用的。** 它本身不提供模型，也不送额度；你需要先有一个**兼容 OpenAI Images API** 的服务（官方 API、自建服务或第三方中转都可以），把服务地址和 Key 填进去才能开始画。
+
+<p align="center">
+  <img src="docs/setup.png" width="320" alt="首次配置页" />
+</p>
+
+首次打开就是上面这个配置页，要填四项：
+
+1. **服务地址**：填到 `/v1` 为止，例如 `https://your-host/v1`。应用会在后面拼 `/models`、`/images/generations`、`/images/edits`。
+2. **API Key**：服务商发给你的 Key，请求时放在 `Authorization: Bearer` 里；只会加密存在本机。
+3. **模型**：点「获取模型列表」从 `/v1/models` 里选；拉不到也可以直接手填模型名。
+4. **名称**：随便起，用来区分多条配置。
+
+保存后才会进入生图界面。生图费用由你使用的服务商收取，本应用不代收、也不提供任何额度。
+
+> 注意：只支持 **Images 接口**，不是 Chat Completions。服务必须实现上面三个端点，并且生图响应返回 `b64_json`——只返回图片 URL 的实现不能直接用。
 
 ## 特性
 
