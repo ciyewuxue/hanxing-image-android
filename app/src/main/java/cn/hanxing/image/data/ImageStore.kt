@@ -162,7 +162,10 @@ class ImageStore(context: Context) {
         if (!trashed.exists()) return false
         if (!trashed.renameTo(target)) return false
         if (_records.none { it.id == record.id }) {
-            _records.add(0, record)
+            // 按时间插回原位：记录是「新的在前」，撤销较早的一张不能直接 add(0)，
+            // 否则它会跑到列表最底部，看起来像最新画的一张。
+            val insertAt = _records.indexOfFirst { it.createdAt < record.createdAt }
+            _records.add(if (insertAt < 0) _records.size else insertAt, record)
             // 恢复的如果是最早一张，标题跟着回到它的提示词
             syncTitle(record.conversationId)
             persist()
