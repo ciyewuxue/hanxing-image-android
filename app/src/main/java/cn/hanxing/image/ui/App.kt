@@ -734,41 +734,38 @@ private fun HomeScreen(state: UiState, viewModel: AppViewModel) {
                 )
 
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    // 聊天式：数据仍是「新的在前」，靠 reverseLayout 把它倒过来画——
-                    // 第一项贴着底部，越往上越旧。好处是停在底部时新卡出现会自动顶上来，
-                    // 图片异步加载改变行高也不会把位置带偏。
-                    reverseLayout = true,
-                ) {
-                    if (state.records.isEmpty() && !state.generating) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillParentMaxHeight(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                EmptyState(onPick = { prompt = it })
+                    val showEmpty = state.records.isEmpty() && !state.generating
+                    if (showEmpty) {
+                        // 空状态不再塞进固定高度的列表项：直接占满列表区，
+                        // 放得下就居中，放不下就自己滚，避免底部被裁掉还滑不回来。
+                        EmptyState(onPick = { prompt = it }, modifier = Modifier.fillMaxSize())
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            // 聊天式：数据仍是「新的在前」，靠 reverseLayout 把它倒过来画——
+                            // 第一项贴着底部，越往上越旧。好处是停在底部时新卡出现会自动顶上来，
+                            // 图片异步加载改变行高也不会把位置带偏。
+                            reverseLayout = true,
+                        ) {
+                            if (state.generating) {
+                                item { GeneratingCard(state = state, onStop = viewModel::stop) }
+                            }
+                            items(state.records, key = { it.id }) { record ->
+                                ImageCard(
+                                    record = record,
+                                    file = viewModel.fileFor(record),
+                                    onPreview = { preview = record },
+                                    onEdit = { viewModel.useAsReference(record) },
+                                    onSave = { viewModel.saveToGallery(record) },
+                                    onRetry = { viewModel.retry(record) },
+                                    onDelete = { viewModel.delete(record) },
+                                )
                             }
                         }
                     }
-                    if (state.generating) {
-                        item { GeneratingCard(state = state, onStop = viewModel::stop) }
-                    }
-                    items(state.records, key = { it.id }) { record ->
-                        ImageCard(
-                            record = record,
-                            file = viewModel.fileFor(record),
-                            onPreview = { preview = record },
-                            onEdit = { viewModel.useAsReference(record) },
-                            onSave = { viewModel.saveToGallery(record) },
-                            onRetry = { viewModel.retry(record) },
-                            onDelete = { viewModel.delete(record) },
-                        )
-                    }
-                }
                     // 提示贴着输入区上方浮动，不挡图片主体
                     AppToast(
                         toast = state.toast,
@@ -1018,46 +1015,64 @@ private fun Header(
 }
 
 @Composable
-private fun EmptyState(onPick: (String) -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(top = 36.dp, bottom = 24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        BrandMark(size = 64.dp)
-        Spacer(Modifier.height(24.dp))
-        Text(
-            text = "说一句话，画一张图",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.SemiBold,
-            lineHeight = 30.sp,
-        )
-        Spacer(Modifier.height(10.dp))
-        Text(
-            text = "比例和清晰度可以在下面的「尺寸」里选，\n也可以直接写在提示词里",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 12.dp),
-        )
-        Spacer(Modifier.height(24.dp))
+private fun EmptyState(onPick: (String) -> Unit, modifier: Modifier = Modifier) {
+    BoxWithConstraints(modifier) {
+        // 361dp 宽、常规字号下这块内容约 488dp，列表区约 497dp，正好放得下；
+        // 再矮或字体放大就切紧凑档，紧凑档仍放不下时交给纵向滚动，保证永远不会被裁掉半张卡。
+        val fontScale = LocalDensity.current.fontScale.coerceIn(1f, 1.4f)
+        val compact = maxHeight < 470.dp * fontScale
+        val scrollState = rememberScrollState()
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 14.dp)
+                .padding(
+                    top = if (compact) 20.dp else 36.dp,
+                    bottom = if (compact) 16.dp else 24.dp,
+                ),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            EXAMPLE_PROMPTS.forEach { example ->
-                Surface(
-                    onClick = { onPick(example) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
-                ) {
-                    Text(
-                        text = example,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    )
+            BrandMark(size = if (compact) 52.dp else 64.dp)
+            Spacer(Modifier.height(if (compact) 18.dp else 24.dp))
+            Text(
+                text = "说一句话，画一张图",
+                fontSize = if (compact) 22.sp else 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = if (compact) 28.sp else 30.sp,
+            )
+            Spacer(Modifier.height(if (compact) 8.dp else 10.dp))
+            Text(
+                text = "比例和清晰度可以在下面的「尺寸」里选，\n也可以直接写在提示词里",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+            Spacer(Modifier.height(if (compact) 16.dp else 24.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 10.dp),
+            ) {
+                EXAMPLE_PROMPTS.forEach { example ->
+                    Surface(
+                        onClick = { onPick(example) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                    ) {
+                        Text(
+                            text = example,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(
+                                horizontal = 16.dp,
+                                vertical = if (compact) 12.dp else 14.dp,
+                            ),
+                        )
+                    }
                 }
             }
         }
